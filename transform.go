@@ -177,6 +177,44 @@ func Rotate(img image.Image, angle float64, bgColor color.Color) *image.NRGBA {
 	return dst
 }
 
+// RotateMove 扩张旋转平移函数 img：输入图片 srcXOff：旋转点X,srcYOff：旋转点Y angle：(逆向)旋转角度 moveX:右移 moveY:下移 dstW：新图片宽 dstH：新图片高
+func RotateMove(img image.Image, srcXOff float64, srcYOff float64, angle float64, moveX float64, moveY float64, dstW int, dstH int, bgColor color.Color) *image.NRGBA {
+	angle = angle - math.Floor(angle/360)*360
+
+	src := toNRGBA(img)
+	//srcW := src.Bounds().Max.X
+	//srcH := src.Bounds().Max.Y
+	//dstW, dstH = srcW, srcH
+	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
+
+	if dstW <= 0 || dstH <= 0 {
+		return dst
+	}
+
+	// 将图片此点设置为原点，然后旋转
+	//srcXOff := 0.0
+	//srcYOff := 75.0
+	// 旋转后需要位移恢复位置
+	dstXOff := srcXOff + moveX // 先右平移
+	dstYOff := srcYOff + moveY // 向下平移
+	//fmt.Println(srcXOff, srcYOff, dstXOff, dstYOff)
+
+	bgColorNRGBA := color.NRGBAModel.Convert(bgColor).(color.NRGBA)
+	sin, cos := math.Sincos(math.Pi * angle / 180)
+
+	parallel(0, dstH, func(ys <-chan int) {
+		for dstY := range ys {
+			for dstX := 0; dstX < dstW; dstX++ {
+				xf, yf := rotatePoint(float64(dstX)-dstXOff, float64(dstY)-dstYOff, sin, cos)
+				xf, yf = xf+srcXOff, yf+srcYOff
+				interpolatePoint(dst, dstX, dstY, src, xf, yf, bgColorNRGBA)
+			}
+		}
+	})
+
+	return dst
+}
+
 func rotatePoint(x, y, sin, cos float64) (float64, float64) {
 	return x*cos - y*sin, x*sin + y*cos
 }
